@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Database, 
   Lock, 
@@ -14,11 +14,15 @@ import {
   Github,
   Twitter,
   LayoutGrid,
-  Layers
+  Layers,
+  Zap as Bolt
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { features, Feature } from './constants';
 import { cn } from './lib/utils';
+import { CodePlayground } from './components/CodePlayground';
+import { RealtimeDemo } from './components/RealtimeDemo';
+import { AuthUsersList } from './components/AuthUsersList';
 
 const IconMap: Record<string, React.ElementType> = {
   Database,
@@ -33,6 +37,24 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFeature, setActiveFeature] = useState<Feature | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [viewMode, setViewMode] = useState<'features' | 'realtime' | 'users'>('features');
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // Auto-close sidebar on mobile
+      if (mobile) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const filteredFeatures = features.filter(f => {
     const matchesCategory = !selectedCategory || f.category === selectedCategory;
@@ -45,11 +67,30 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-supabase-black text-white overflow-hidden">
+      {/* Mobile overlay when sidebar is open */}
+      <AnimatePresence>
+        {isMobile && isSidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 md:hidden"
+          />
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
       <motion.aside 
         initial={false}
-        animate={{ width: isSidebarOpen ? 280 : 80 }}
-        className="border-r border-white/10 bg-supabase-dark flex flex-col z-20"
+        animate={{ 
+          width: isSidebarOpen ? 280 : 80,
+          x: isMobile && !isSidebarOpen ? -280 : 0
+        }}
+        className={cn(
+          "border-r border-white/10 bg-supabase-dark flex flex-col z-40",
+          isMobile ? "fixed h-screen" : "relative"
+        )}
       >
         <div className="p-6 flex items-center justify-between">
           {isSidebarOpen ? (
@@ -102,30 +143,102 @@ export default function App() {
 
         <div className="p-4 border-t border-white/10 space-y-2">
           <button 
+            onClick={() => {
+              setViewMode('features');
+              setSelectedCategory(null);
+              setActiveFeature(null);
+            }}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm",
+              viewMode === 'features' 
+                ? "bg-supabase-green/10 text-supabase-green" 
+                : "hover:bg-white/5 text-white/60 hover:text-white"
+            )}
+          >
+            <LayoutGrid size={20} />
+            {isSidebarOpen && <span>Características</span>}
+          </button>
+
+          <button 
+            onClick={() => {
+              setViewMode('users');
+              setSelectedCategory(null);
+              setActiveFeature(null);
+            }}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm",
+              viewMode === 'users' 
+                ? "bg-supabase-green/10 text-supabase-green" 
+                : "hover:bg-white/5 text-white/60 hover:text-white"
+            )}
+          >
+            <Lock size={20} />
+            {isSidebarOpen && <span>Usuarios</span>}
+          </button>
+
+          <button 
+            onClick={() => {
+              setViewMode('realtime');
+              setSelectedCategory(null);
+              setActiveFeature(null);
+            }}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm",
+              viewMode === 'realtime' 
+                ? "bg-supabase-green/10 text-supabase-green" 
+                : "hover:bg-white/5 text-white/60 hover:text-white"
+            )}
+          >
+            <Activity size={20} />
+            {isSidebarOpen && <span>Tiempo Real</span>}
+          </button>
+          
+          <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-white/60 hover:text-white transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-white/60 hover:text-white transition-colors text-sm"
           >
             {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-            {isSidebarOpen && <span>Collapse Sidebar</span>}
+            {isSidebarOpen && <span>Ocultar Sidebar</span>}
           </button>
         </div>
       </motion.aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden relative">
+      <main className={cn(
+        "flex-1 flex flex-col overflow-hidden relative transition-all",
+        isMobile && isSidebarOpen ? "ml-0" : ""
+      )}>
         {/* Header */}
-        <header className="h-16 border-b border-white/10 flex items-center justify-between px-8 bg-supabase-black/50 backdrop-blur-md sticky top-0 z-10">
-          <div className="relative w-96">
+        <header className="h-16 border-b border-white/10 flex items-center justify-between px-4 md:px-8 bg-supabase-black/50 backdrop-blur-md sticky top-0 z-10">
+          {/* Mobile menu button */}
+          {isMobile && (
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 hover:bg-white/5 rounded-lg transition-colors"
+            >
+              {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          )}
+
+          <div className={cn(
+            "relative flex-1 max-w-96",
+            isMobile && isSidebarOpen ? "hidden" : ""
+          )}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 w-4 h-4" />
             <input 
               type="text" 
-              placeholder="Search features, functions, docs..."
+              placeholder={isMobile ? "Search..." : "Search features, functions, docs..."}
               className="w-full bg-white/5 border border-white/10 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-supabase-green/50 transition-colors"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-4">
+
+          {/* Desktop header buttons */}
+          <div className={cn(
+            "flex items-center gap-4",
+            isMobile ? "hidden" : ""
+          )}>
             <a href="#" className="text-white/60 hover:text-white transition-colors">
               <Github size={20} />
             </a>
@@ -139,18 +252,51 @@ export default function App() {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-6xl mx-auto">
-            <header className="mb-12">
-              <h1 className="text-4xl font-bold mb-4 tracking-tight">
-                {selectedCategory || 'Supabase Features'}
-              </h1>
-              <p className="text-white/60 text-lg max-w-2xl">
-                Explore the powerful tools and functions that make Supabase the best open-source Firebase alternative.
-              </p>
-            </header>
+            {viewMode === 'realtime' && (
+              <>
+                <header className="mb-8 md:mb-12">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Activity className="text-supabase-green" size={32} />
+                    <h1 className="text-2xl md:text-4xl font-bold tracking-tight">
+                      Tiempo Real
+                    </h1>
+                  </div>
+                  <p className="text-white/60 text-sm md:text-lg max-w-2xl">
+                    Monitorea cambios en vivo en tus tablas de Supabase. Visualiza operaciones INSERT, UPDATE y DELETE conforme suceden.
+                  </p>
+                </header>
+                <RealtimeDemo />
+              </>
+            )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {viewMode === 'users' && (
+              <>
+                <header className="mb-8 md:mb-12">
+                  <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-4 tracking-tight">
+                    Control de Usuarios
+                  </h1>
+                  <p className="text-white/60 text-sm md:text-lg max-w-2xl">
+                    Visualiza y gestiona todos los usuarios autenticados en tu aplicación Supabase.
+                  </p>
+                </header>
+                <AuthUsersList />
+              </>
+            )}
+
+            {viewMode === 'features' && (
+              <>
+                <header className="mb-8 md:mb-12">
+                  <h1 className="text-2xl md:text-4xl font-bold mb-2 md:mb-4 tracking-tight">
+                    {selectedCategory || 'Características de Supabase'}
+                  </h1>
+                  <p className="text-white/60 text-sm md:text-lg max-w-2xl">
+                    Explora las herramientas y funciones que hacen de Supabase la mejor alternativa open-source a Firebase.
+                  </p>
+                </header>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               <AnimatePresence mode="popLayout">
                 {filteredFeatures.map((feature) => (
                   <motion.div
@@ -187,8 +333,10 @@ export default function App() {
                     </div>
                   </motion.div>
                 ))}
-              </AnimatePresence>
-            </div>
+                </AnimatePresence>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </main>
@@ -205,36 +353,41 @@ export default function App() {
               className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40"
             />
             <motion.div 
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
+              initial={isMobile ? { y: '100%' } : { x: '100%' }}
+              animate={isMobile ? { y: 0 } : { x: 0 }}
+              exit={isMobile ? { y: '100%' } : { x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed right-0 top-0 bottom-0 w-full max-w-2xl bg-supabase-dark border-l border-white/10 z-50 overflow-y-auto"
+              className={cn(
+                "fixed bg-supabase-dark border-white/10 z-50 overflow-y-auto",
+                isMobile 
+                  ? "inset-x-0 bottom-0 top-16 rounded-t-3xl border-t"
+                  : "right-0 top-0 bottom-0 w-full max-w-2xl border-l"
+              )}
             >
-              <div className="p-8">
+              <div className="p-4 md:p-8">
                 <button 
                   onClick={() => setActiveFeature(null)}
-                  className="mb-8 p-2 hover:bg-white/5 rounded-full transition-colors"
+                  className="mb-4 md:mb-8 p-2 hover:bg-white/5 rounded-full transition-colors float-right"
                 >
                   <X size={24} />
                 </button>
 
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-16 h-16 bg-supabase-green/10 rounded-2xl flex items-center justify-center">
+                <div className="flex flex-col md:flex-row items-start gap-4 mb-6 clear-both">
+                  <div className="w-12 h-12 md:w-16 md:h-16 bg-supabase-green/10 rounded-2xl flex-shrink-0 flex items-center justify-center">
                     {React.createElement(IconMap[activeFeature.icon], { 
                       className: "text-supabase-green",
-                      size: 32
+                      size: isMobile ? 24 : 32
                     })}
                   </div>
                   <div>
                     <span className="text-xs font-bold uppercase tracking-widest text-supabase-green mb-1 block">
                       {activeFeature.category}
                     </span>
-                    <h2 className="text-3xl font-bold">{activeFeature.title}</h2>
+                    <h2 className="text-2xl md:text-3xl font-bold">{activeFeature.title}</h2>
                   </div>
                 </div>
 
-                <p className="text-white/60 text-lg mb-10 leading-relaxed">
+                <p className="text-white/60 text-base md:text-lg mb-8 md:mb-10 leading-relaxed">
                   {activeFeature.description}
                 </p>
 
@@ -254,19 +407,13 @@ export default function App() {
                   </section>
 
                   <section>
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-sm font-bold uppercase tracking-widest text-white/40 flex items-center gap-2">
-                        <Code2 size={16} /> Code Example
-                      </h4>
-                      <button className="text-[10px] font-bold uppercase tracking-widest text-white/30 hover:text-white transition-colors">
-                        Copy Snippet
-                      </button>
-                    </div>
-                    <div className="bg-supabase-black rounded-xl p-6 border border-white/10 font-mono text-sm overflow-x-auto">
-                      <pre className="text-supabase-green">
-                        <code>{activeFeature.codeSnippet}</code>
-                      </pre>
-                    </div>
+                    <h4 className="text-sm font-bold uppercase tracking-widest text-white/40 mb-4 flex items-center gap-2">
+                      <Code2 size={16} /> Code Example
+                    </h4>
+                    <CodePlayground 
+                      code={activeFeature.codeSnippet}
+                      language="typescript"
+                    />
                   </section>
 
                   {activeFeature.id === 'realtime-sync' && (
@@ -295,12 +442,21 @@ export default function App() {
                     </section>
                   )}
 
-                  <div className="pt-8 border-t border-white/10 flex gap-4">
-                    <button className="flex-1 bg-supabase-green text-supabase-black font-bold py-3 rounded-xl hover:bg-supabase-green/90 transition-colors flex items-center justify-center gap-2">
+                  <div className={cn(
+                    "pt-8 border-t border-white/10 flex gap-4",
+                    isMobile ? "flex-col" : ""
+                  )}>
+                    <button className={cn(
+                      "bg-supabase-green text-supabase-black font-bold py-3 rounded-xl hover:bg-supabase-green/90 transition-colors flex items-center justify-center gap-2",
+                      isMobile ? "w-full" : "flex-1"
+                    )}>
                       Documentation <ExternalLink size={18} />
                     </button>
-                    <button className="flex-1 bg-white/5 text-white font-bold py-3 rounded-xl hover:bg-white/10 transition-colors border border-white/10">
-                      View Examples
+                    <button className={cn(
+                      "bg-white/5 text-white font-bold py-3 rounded-xl hover:bg-white/10 transition-colors flex items-center justify-center gap-2 border border-white/10",
+                      isMobile ? "w-full" : "flex-1"
+                    )}>
+                      Learn More
                     </button>
                   </div>
                 </div>
